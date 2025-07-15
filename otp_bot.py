@@ -2,7 +2,6 @@ import time
 import re
 import threading
 import requests
-import shutil
 from flask import Flask, request
 from selenium import webdriver
 from selenium.webdriver.common.by import By
@@ -67,19 +66,18 @@ def set_webhook():
     else:
         print("❌ Webhook failed:", response.text)
 
-# === Chromium Setup ===
+# === Browser Setup ===
 def setup_driver():
     chrome_options = Options()
-    binary_path = shutil.which("chromium-browser") or shutil.which("chromium")
-    if not binary_path:
-        raise Exception("❌ Chromium not found on system.")
-    chrome_options.binary_location = binary_path
+    chrome_options.binary_location = "/usr/bin/chromium-browser"  # Works on Render
+
     chrome_options.add_argument("--headless=new")
     chrome_options.add_argument("--no-sandbox")
     chrome_options.add_argument("--disable-dev-shm-usage")
+
     return webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=chrome_options)
 
-# === OTP Parser ===
+# === OTP Extraction ===
 def extract_otp(text):
     match = re.search(r'\b\d{4,8}\b', text)
     return match.group(0) if match else None
@@ -96,7 +94,7 @@ OTP - {otp}
 𝑩𝒐𝒕 𝒃𝒚 𝑫𝒆𝒗 | 𝑫𝑿𝒁 𝑾𝒐𝒓𝒌𝒛𝒐𝒏𝒆 𝒊𝒏𝒄.
 """.strip()
 
-# === Login Test (/login command) ===
+# === /login Command Handler ===
 def test_login():
     try:
         driver = setup_driver()
@@ -128,7 +126,7 @@ def test_login():
     except Exception as e:
         return f"❌ Error during login: {str(e)}"
 
-# === Main Login + Monitor ===
+# === Real Login + OTP Monitor ===
 def login(driver):
     print("🔐 Logging into IVASMS...")
     driver.get('https://www.ivasms.com/login')
