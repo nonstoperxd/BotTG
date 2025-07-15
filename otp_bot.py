@@ -32,7 +32,7 @@ def run_flask():
 
 # === Config ===
 TELEGRAM_BOT_TOKEN = "7681288998:AAE9OzduHanSU3drsnAsCmOY2na7af0OVro"
-TELEGRAM_CHAT_ID = "1002541578739"
+TELEGRAM_CHAT_ID = "-1002541578739"
 WEBHOOK_URL = f"https://bottg-4mz8.onrender.com/webhook/{TELEGRAM_BOT_TOKEN}"
 
 EMAIL = 'Unseendevx2@gmail.com'
@@ -44,9 +44,12 @@ def send_message(chat_id, text):
     url = f'https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage'
     payload = {'chat_id': chat_id, 'text': text, 'parse_mode': 'Markdown'}
     try:
-        return requests.post(url, data=payload).ok
+        response = requests.post(url, data=payload)
+        if not response.ok:
+            print("❌ Telegram Error:", response.status_code, response.text)
+        return response.ok
     except Exception as e:
-        print("Telegram Error:", e)
+        print("Telegram Exception:", e)
         return False
 
 def set_webhook():
@@ -86,23 +89,29 @@ def login(driver):
     driver.get('https://www.ivasms.com/login')
     time.sleep(2)
 
-    # Fill email field
     email_input = driver.find_element(By.XPATH, "//input[@type='email']")
     email_input.send_keys(EMAIL)
 
-    # Fill password field
     password_input = driver.find_element(By.XPATH, "//input[@type='password']")
     password_input.send_keys(PASSWORD)
 
-    # Click on 'Remember Me'
     remember_checkbox = driver.find_element(By.NAME, "remember")
     if not remember_checkbox.is_selected():
         remember_checkbox.click()
 
-    # Submit login form
     login_button = driver.find_element(By.CSS_SELECTOR, "button[type='submit']")
     login_button.click()
+
     time.sleep(5)
+
+    # ✅ Check if redirected page contains "Dashboard"
+    if "Dashboard" in driver.page_source:
+        print("✅ Login successful — 'Dashboard' found.")
+        return True
+    else:
+        print("❌ Login failed — 'Dashboard' not found.")
+        send_message(TELEGRAM_CHAT_ID, "❌ *Login to IVASMS failed.* Please check credentials or site status.")
+        return False
 
 def monitor_sms(driver):
     global last_sent_otp
@@ -134,16 +143,21 @@ def monitor_sms(driver):
         except Exception as e:
             print("⚠️ Error:", e)
             time.sleep(10)
-            login(driver)
-            driver.get('https://www.ivasms.com/portal/live/my_sms')
+            if login(driver):
+                driver.get('https://www.ivasms.com/portal/live/my_sms')
+            else:
+                print("❌ Stopping monitor due to failed re-login.")
+                break
 
 def main():
     set_webhook()
     threading.Thread(target=run_flask).start()
     driver = setup_driver()
     try:
-        login(driver)
-        monitor_sms(driver)
+        if login(driver):
+            monitor_sms(driver)
+        else:
+            print("❌ Exiting: Login failed.")
     finally:
         driver.quit()
 
