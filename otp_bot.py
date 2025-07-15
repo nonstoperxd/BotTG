@@ -2,7 +2,6 @@ import time
 import re
 import threading
 import requests
-import os
 from flask import Flask, request
 from selenium import webdriver
 from selenium.webdriver.common.by import By
@@ -32,7 +31,8 @@ def run_flask():
 
 # === Config ===
 TELEGRAM_BOT_TOKEN = "7681288998:AAE9OzduHanSU3drsnAsCmOY2na7af0OVro"
-TELEGRAM_CHAT_ID = "-1002541578739"
+TELEGRAM_CHAT_ID = "-1002541578739"  # Your channel
+TELEGRAM_USER_ID = 6864709585        # Your personal Telegram ID (@Unlimitedxr)
 WEBHOOK_URL = f"https://bottg-4mz8.onrender.com/webhook/{TELEGRAM_BOT_TOKEN}"
 
 EMAIL = 'Unseendevx2@gmail.com'
@@ -101,12 +101,11 @@ def login(driver):
 
     login_button = driver.find_element(By.CSS_SELECTOR, "button[type='submit']")
     login_button.click()
-
     time.sleep(5)
 
-    # ✅ Check if redirected page contains "Dashboard"
     if "Dashboard" in driver.page_source:
         print("✅ Login successful — 'Dashboard' found.")
+        send_message(TELEGRAM_USER_ID, "✅ Login to IVASMS successful. Bot is now monitoring OTPs.")
         return True
     else:
         print("❌ Login failed — 'Dashboard' not found.")
