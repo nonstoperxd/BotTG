@@ -22,9 +22,15 @@ def telegram_webhook():
     data = request.get_json()
     if data and "message" in data:
         chat_id = data["message"]["chat"]["id"]
-        text = data["message"].get("text", "")
-        if text.strip().lower() == "/start":
+        text = data["message"].get("text", "").strip().lower()
+
+        if text == "/start":
             send_message(chat_id, "✅ Bot is running and monitoring OTPs!")
+
+        elif text == "/login":
+            result = test_login()
+            send_message(chat_id, result)
+
     return {"ok": True}, 200
 
 def run_flask():
@@ -61,7 +67,19 @@ def set_webhook():
     else:
         print("❌ Webhook failed:", response.text)
 
-# === OTP Monitoring ===
+# === Chromium Setup ===
+def setup_driver():
+    chrome_options = Options()
+    binary_path = shutil.which("chromium-browser") or shutil.which("chromium")
+    if not binary_path:
+        raise Exception("❌ Chromium not found on system.")
+    chrome_options.binary_location = binary_path
+    chrome_options.add_argument("--headless=new")
+    chrome_options.add_argument("--no-sandbox")
+    chrome_options.add_argument("--disable-dev-shm-usage")
+    return webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=chrome_options)
+
+# === OTP Parser ===
 def extract_otp(text):
     match = re.search(r'\b\d{4,8}\b', text)
     return match.group(0) if match else None
@@ -78,17 +96,39 @@ OTP - {otp}
 𝑩𝒐𝒕 𝒃𝒚 𝑫𝒆𝒗 | 𝑫𝑿𝒁 𝑾𝒐𝒓𝒌𝒛𝒐𝒏𝒆 𝒊𝒏𝒄.
 """.strip()
 
-def setup_driver():
-    chrome_options = Options()
-    binary_path = shutil.which("chromium-browser") or shutil.which("chromium")
-    if not binary_path:
-        raise Exception("❌ Chromium not found on system.")
-    chrome_options.binary_location = binary_path
-    chrome_options.add_argument("--headless=new")
-    chrome_options.add_argument("--no-sandbox")
-    chrome_options.add_argument("--disable-dev-shm-usage")
-    return webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=chrome_options)
+# === Login Test (/login command) ===
+def test_login():
+    try:
+        driver = setup_driver()
+        driver.get("https://www.ivasms.com/login")
+        time.sleep(2)
 
+        email_input = driver.find_element(By.XPATH, "//input[@type='email']")
+        email_input.send_keys(EMAIL)
+
+        password_input = driver.find_element(By.XPATH, "//input[@type='password']")
+        password_input.send_keys(PASSWORD)
+
+        remember_checkbox = driver.find_element(By.NAME, "remember")
+        if not remember_checkbox.is_selected():
+            remember_checkbox.click()
+
+        login_button = driver.find_element(By.CSS_SELECTOR, "button[type='submit']")
+        login_button.click()
+        time.sleep(5)
+
+        page_source = driver.page_source
+        driver.quit()
+
+        if "Dashboard" in page_source:
+            return "✅ Login successful: Dashboard found."
+        else:
+            return "❌ Login failed: Dashboard not found."
+
+    except Exception as e:
+        return f"❌ Error during login: {str(e)}"
+
+# === Main Login + Monitor ===
 def login(driver):
     print("🔐 Logging into IVASMS...")
     driver.get('https://www.ivasms.com/login')
