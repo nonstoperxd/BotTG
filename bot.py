@@ -1,20 +1,34 @@
 import time
 import re
 import requests
+import os
+import threading
+from flask import Flask
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.chrome.service import Service
+from webdriver_manager.chrome import ChromeDriverManager
 
-# Telegram Configuration
-TELEGRAM_BOT_TOKEN = '7681288998:AAE9OzduHanSU3drsnAsCmOY2na7af0OVro'
-TELEGRAM_CHAT_ID = '1002541578739'
+# ==== Flask for health check ====
+app = Flask(__name__)
 
-# Login Credentials
+@app.route("/")
+def index():
+    return "OTP Bot is running!", 200
+
+def run_flask():
+    app.run(host='0.0.0.0', port=10000)
+
+# ==== Telegram Configuration ====
+TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "7681288998:AAE9OzduHanSU3drsnAsCmOY2na7af0OVro")
+TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "1002541578739")
+
+# ==== IVASMS Login Credentials ====
 EMAIL = 'Unseendevx2@gmail.com'
 PASSWORD = 'RheaxDev@2025'
 
-# State memory to avoid duplicate OTPs
-last_sent_otp = None
+last_sent_otp = None  # Cache last OTP
 
 def send_to_telegram(message):
     url = f'https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage'
@@ -23,8 +37,12 @@ def send_to_telegram(message):
         'text': message,
         'parse_mode': 'Markdown'
     }
-    response = requests.post(url, data=payload)
-    return response.ok
+    try:
+        response = requests.post(url, data=payload)
+        return response.ok
+    except Exception as e:
+        print("Telegram Error:", e)
+        return False
 
 def extract_otp(text):
     match = re.search(r'\b\d{4,8}\b', text)
@@ -45,13 +63,13 @@ OTP - {otp}
 def setup_driver():
     chrome_options = Options()
     chrome_options.add_argument("--headless=new")
+    chrome_options.add_argument("--no-sandbox")
+    chrome_options.add_argument("--disable-dev-shm-usage")
     chrome_options.add_argument("--disable-blink-features=AutomationControlled")
-    chrome_options.add_argument("--disable-infobars")
-    chrome_options.add_argument("--start-maximized")
-    driver = webdriver.Chrome(options=chrome_options)
-    return driver
+    return webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=chrome_options)
 
 def login(driver):
+    print("🔐 Logging into IVASMS...")
     driver.get('https://www.ivasms.com/login')
     driver.find_element(By.NAME, "email").send_keys(EMAIL)
     driver.find_element(By.NAME, "password").send_keys(PASSWORD)
@@ -62,7 +80,7 @@ def login(driver):
 def monitor_sms(driver):
     global last_sent_otp
     driver.get('https://www.ivasms.com/portal/live/my_sms')
-    print("🔍 Monitoring OTPs...")
+    print("📡 Monitoring SMS panel...")
 
     while True:
         try:
@@ -82,19 +100,20 @@ def monitor_sms(driver):
                     last_sent_otp = otp
                     formatted = format_message(location, sid, mobile_number, otp)
                     if send_to_telegram(formatted):
-                        print(f"✅ Sent OTP: {otp}")
+                        print(f"✅ OTP Sent: {otp}")
                     else:
-                        print("❌ Failed to send to Telegram")
+                        print("❌ Failed to send OTP")
 
             time.sleep(5)
+
         except Exception as e:
-            print("⚠️ Error:", e)
+            print("⚠️ Error occurred:", e)
             time.sleep(10)
-            # Auto relogin if session expired
             login(driver)
             driver.get('https://www.ivasms.com/portal/live/my_sms')
 
 def main():
+    threading.Thread(target=run_flask).start()
     driver = setup_driver()
     try:
         login(driver)
