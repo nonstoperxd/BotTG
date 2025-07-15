@@ -1,4 +1,4 @@
-selenium==4.19.0
+Flask
 requests
-flask
+selenium
 webdriver-manager
