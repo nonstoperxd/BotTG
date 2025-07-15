@@ -3,6 +3,7 @@ import time
 import re
 import threading
 import requests
+import shutil
 from flask import Flask, request
 from selenium import webdriver
 from selenium.webdriver.common.by import By
