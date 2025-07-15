@@ -33,7 +33,7 @@ def run_flask():
 # === Telegram Bot Configuration ===
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "7681288998:AAE9OzduHanSU3drsnAsCmOY2na7af0OVro")
 TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "1002541578739")
-WEBHOOK_URL = f"https://your-render-url.onrender.com/webhook/{TELEGRAM_BOT_TOKEN}"
+WEBHOOK_URL = f"WEBHOOK_URL = "https://bottg-4mz8.onrender.com/webhook/7681288998:AAE9OzduHanSU3drsnAsCmOY2na7af0OVro"}"
 
 # === IVASMS Credentials ===
 EMAIL = 'Unseendevx2@gmail.com'
