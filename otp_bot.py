@@ -1,49 +1,69 @@
 import time
 import re
+import threading
 import requests
 import os
-import threading
-from flask import Flask
+from flask import Flask, request
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.chrome.service import Service
 from webdriver_manager.chrome import ChromeDriverManager
 
-# ==== Flask for health check ====
+# === Flask App (Health Check + Telegram Webhook Handler) ===
 app = Flask(__name__)
 
 @app.route("/")
 def index():
     return "OTP Bot is running!", 200
 
+@app.route(f"/webhook/{TELEGRAM_BOT_TOKEN}", methods=["POST"])
+def telegram_webhook():
+    data = request.get_json()
+    if data and "message" in data:
+        chat_id = data["message"]["chat"]["id"]
+        text = data["message"].get("text", "")
+        if text.strip() == "/start":
+            send_message(chat_id, "✅ Bot is running and monitoring OTPs!")
+    return {"ok": True}, 200
+
 def run_flask():
     app.run(host='0.0.0.0', port=10000)
 
-# ==== Telegram Configuration ====
+# === Telegram Bot Configuration ===
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "7681288998:AAE9OzduHanSU3drsnAsCmOY2na7af0OVro")
 TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "1002541578739")
+WEBHOOK_URL = f"https://your-render-url.onrender.com/webhook/{TELEGRAM_BOT_TOKEN}"
 
-# ==== IVASMS Login Credentials ====
+# === IVASMS Credentials ===
 EMAIL = 'Unseendevx2@gmail.com'
 PASSWORD = 'RheaxDev@2025'
 
-last_sent_otp = None  # Cache last OTP
+last_sent_otp = None
 
-def send_to_telegram(message):
+# === Telegram API ===
+def send_message(chat_id, text):
     url = f'https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage'
     payload = {
-        'chat_id': TELEGRAM_CHAT_ID,
-        'text': message,
+        'chat_id': chat_id,
+        'text': text,
         'parse_mode': 'Markdown'
     }
     try:
-        response = requests.post(url, data=payload)
-        return response.ok
+        return requests.post(url, data=payload).ok
     except Exception as e:
         print("Telegram Error:", e)
         return False
 
+def set_webhook():
+    url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/setWebhook"
+    response = requests.post(url, data={"url": WEBHOOK_URL})
+    if response.ok:
+        print("✅ Webhook set successfully.")
+    else:
+        print("❌ Failed to set webhook:", response.text)
+
+# === OTP Monitoring ===
 def extract_otp(text):
     match = re.search(r'\b\d{4,8}\b', text)
     return match.group(0) if match else None
@@ -65,7 +85,6 @@ def setup_driver():
     chrome_options.add_argument("--headless=new")
     chrome_options.add_argument("--no-sandbox")
     chrome_options.add_argument("--disable-dev-shm-usage")
-    chrome_options.add_argument("--disable-blink-features=AutomationControlled")
     return webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=chrome_options)
 
 def login(driver):
@@ -80,7 +99,7 @@ def login(driver):
 def monitor_sms(driver):
     global last_sent_otp
     driver.get('https://www.ivasms.com/portal/live/my_sms')
-    print("📡 Monitoring SMS panel...")
+    print("📡 Monitoring SMS...")
 
     while True:
         try:
@@ -98,21 +117,20 @@ def monitor_sms(driver):
                 otp = extract_otp(message)
                 if otp and otp != last_sent_otp:
                     last_sent_otp = otp
-                    formatted = format_message(location, sid, mobile_number, otp)
-                    if send_to_telegram(formatted):
-                        print(f"✅ OTP Sent: {otp}")
+                    text = format_message(location, sid, mobile_number, otp)
+                    if send_message(TELEGRAM_CHAT_ID, text):
+                        print(f"✅ Sent OTP: {otp}")
                     else:
                         print("❌ Failed to send OTP")
-
             time.sleep(5)
-
         except Exception as e:
-            print("⚠️ Error occurred:", e)
+            print("⚠️ Error:", e)
             time.sleep(10)
             login(driver)
             driver.get('https://www.ivasms.com/portal/live/my_sms')
 
 def main():
+    set_webhook()
     threading.Thread(target=run_flask).start()
     driver = setup_driver()
     try:
