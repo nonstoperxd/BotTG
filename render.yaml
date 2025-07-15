@@ -25,7 +25,7 @@ services:
     startCommand: python otp_bot.py
     envVars:
       TELEGRAM_BOT_TOKEN: "7681288998:AAE9OzduHanSU3drsnAsCmOY2na7af0OVro"
-      TELEGRAM_CHAT_ID: "-1002541578739"
+      TELEGRAM_CHAT_ID: "1002541578739"
       TELEGRAM_USER_ID: "6864709585"
       EMAIL: "Unseendevx2@gmail.com"
       PASSWORD: "RheaxDev@2025"
