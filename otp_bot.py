@@ -1,3 +1,4 @@
+import os
 import time
 import re
 import threading
@@ -17,7 +18,7 @@ app = Flask(__name__)
 def index():
     return "OTP Bot is running!", 200
 
-@app.route(f"/webhook/7681288998:AAE9OzduHanSU3drsnAsCmOY2na7af0OVro", methods=["POST"])
+@app.route(f"/webhook/{os.environ['TELEGRAM_BOT_TOKEN']}", methods=["POST"])
 def telegram_webhook():
     data = request.get_json()
     if data and "message" in data:
@@ -37,13 +38,11 @@ def run_flask():
     app.run(host='0.0.0.0', port=10000)
 
 # === Config ===
-TELEGRAM_BOT_TOKEN = "7681288998:AAE9OzduHanSU3drsnAsCmOY2na7af0OVro"
-TELEGRAM_CHAT_ID = "-1002541578739"
-TELEGRAM_USER_ID = 6864709585
-WEBHOOK_URL = f"https://bottg-4mz8.onrender.com/webhook/{TELEGRAM_BOT_TOKEN}"
-
-EMAIL = 'Unseendevx2@gmail.com'
-PASSWORD = 'RheaxDev@2025'
+TELEGRAM_BOT_TOKEN = os.environ['TELEGRAM_BOT_TOKEN']
+TELEGRAM_CHAT_ID = os.environ['TELEGRAM_CHAT_ID']
+TELEGRAM_USER_ID = os.environ['TELEGRAM_USER_ID']
+EMAIL = os.environ['EMAIL']
+PASSWORD = os.environ['PASSWORD']
 last_sent_otp = None
 
 # === Telegram Send ===
@@ -59,22 +58,9 @@ def send_message(chat_id, text):
         print("Telegram Exception:", e)
         return False
 
-def set_webhook():
-    url = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/setWebhook"
-    response = requests.post(url, data={"url": WEBHOOK_URL})
-    if response.ok:
-        print("✅ Webhook set successfully.")
-    else:
-        print("❌ Webhook failed:", response.text)
-
-# === Browser Setup ===
 def setup_driver():
     chrome_options = Options()
-    binary_path = shutil.which("chromium-browser") or shutil.which("chromium") or shutil.which("google-chrome")
-    if not binary_path:
-        raise Exception("❌ Chromium not found on system.")
-    
-    chrome_options.binary_location = binary_path
+    chrome_options.binary_location = "/usr/bin/chromium"  # Path to Chromium on Render
     chrome_options.add_argument("--headless=new")
     chrome_options.add_argument("--no-sandbox")
     chrome_options.add_argument("--disable-dev-shm-usage")
@@ -131,72 +117,7 @@ def test_login():
         return f"❌ Error during login: {str(e)}"
 
 # === Main Login + Monitor ===
-def login(driver):
-    print("🔐 Logging into IVASMS...")
-    driver.get('https://www.ivasms.com/login')
-    time.sleep(2)
-
-    email_input = driver.find_element(By.XPATH, "//input[@type='email']")
-    email_input.send_keys(EMAIL)
-
-    password_input = driver.find_element(By.XPATH, "//input[@type='password']")
-    password_input.send_keys(PASSWORD)
-
-    remember_checkbox = driver.find_element(By.NAME, "remember")
-    if not remember_checkbox.is_selected():
-        remember_checkbox.click()
-
-    login_button = driver.find_element(By.CSS_SELECTOR, "button[type='submit']")
-    login_button.click()
-    time.sleep(5)
-
-    if "Dashboard" in driver.page_source:
-        print("✅ Login successful.")
-        send_message(TELEGRAM_USER_ID, "✅ Login to IVASMS successful. Bot is now monitoring OTPs.")
-        return True
-    else:
-        print("❌ Login failed.")
-        send_message(TELEGRAM_CHAT_ID, "❌ *Login to IVASMS failed.* Please check credentials or site status.")
-        return False
-
-def monitor_sms(driver):
-    global last_sent_otp
-    driver.get('https://www.ivasms.com/portal/live/my_sms')
-    print("📡 Monitoring OTPs...")
-
-    while True:
-        try:
-            rows = driver.find_elements(By.CSS_SELECTOR, "table tbody tr")
-            for row in rows:
-                cols = row.find_elements(By.TAG_NAME, "td")
-                if len(cols) < 5:
-                    continue
-
-                location = cols[0].text.strip()
-                sid = cols[1].text.strip()
-                message = cols[3].text.strip()
-                mobile_number = cols[4].text.strip()
-
-                otp = extract_otp(message)
-                if otp and otp != last_sent_otp:
-                    last_sent_otp = otp
-                    msg = format_message(location, sid, mobile_number, otp)
-                    if send_message(TELEGRAM_CHAT_ID, msg):
-                        print(f"✅ OTP Sent: {otp}")
-                    else:
-                        print("❌ Failed to send OTP")
-            time.sleep(5)
-        except Exception as e:
-            print("⚠️ Error:", e)
-            time.sleep(10)
-            if login(driver):
-                driver.get('https://www.ivasms.com/portal/live/my_sms')
-            else:
-                print("❌ Stopping monitor due to failed re-login.")
-                break
-
 def main():
-    set_webhook()
     threading.Thread(target=run_flask).start()
     driver = setup_driver()
     try:
