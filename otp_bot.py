@@ -2,6 +2,7 @@ import time
 import re
 import threading
 import requests
+import shutil
 from flask import Flask, request
 from selenium import webdriver
 from selenium.webdriver.common.by import By
@@ -79,7 +80,10 @@ OTP - {otp}
 
 def setup_driver():
     chrome_options = Options()
-    chrome_options.binary_location = "/usr/bin/google-chrome"  # For Render
+    binary_path = shutil.which("chromium-browser") or shutil.which("chromium")
+    if not binary_path:
+        raise Exception("❌ Chromium not found on system.")
+    chrome_options.binary_location = binary_path
     chrome_options.add_argument("--headless=new")
     chrome_options.add_argument("--no-sandbox")
     chrome_options.add_argument("--disable-dev-shm-usage")
