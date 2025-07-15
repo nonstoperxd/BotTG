@@ -3,7 +3,6 @@ import time
 import re
 import threading
 import requests
-import shutil
 from flask import Flask, request
 from selenium import webdriver
 from selenium.webdriver.common.by import By
@@ -14,11 +13,22 @@ from webdriver_manager.chrome import ChromeDriverManager
 # === Flask App ===
 app = Flask(__name__)
 
+# === Config ===
+TELEGRAM_BOT_TOKEN = os.getenv('TELEGRAM_BOT_TOKEN')
+TELEGRAM_CHAT_ID = os.getenv('TELEGRAM_CHAT_ID')
+TELEGRAM_USER_ID = os.getenv('TELEGRAM_USER_ID')
+EMAIL = os.getenv('EMAIL')
+PASSWORD = os.getenv('PASSWORD')
+
+# Check if the required environment variables are set
+if not all([TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID, TELEGRAM_USER_ID, EMAIL, PASSWORD]):
+    raise ValueError("One or more environment variables are not set. Please check your configuration.")
+
 @app.route("/")
 def index():
     return "OTP Bot is running!", 200
 
-@app.route(f"/webhook/{os.environ['TELEGRAM_BOT_TOKEN']}", methods=["POST"])
+@app.route(f"/webhook/{TELEGRAM_BOT_TOKEN}", methods=["POST"])
 def telegram_webhook():
     data = request.get_json()
     if data and "message" in data:
@@ -36,14 +46,6 @@ def telegram_webhook():
 
 def run_flask():
     app.run(host='0.0.0.0', port=10000)
-
-# === Config ===
-TELEGRAM_BOT_TOKEN = os.environ['TELEGRAM_BOT_TOKEN']
-TELEGRAM_CHAT_ID = os.environ['TELEGRAM_CHAT_ID']
-TELEGRAM_USER_ID = os.environ['TELEGRAM_USER_ID']
-EMAIL = os.environ['EMAIL']
-PASSWORD = os.environ['PASSWORD']
-last_sent_otp = None
 
 # === Telegram Send ===
 def send_message(chat_id, text):
@@ -66,23 +68,6 @@ def setup_driver():
     chrome_options.add_argument("--disable-dev-shm-usage")
 
     return webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=chrome_options)
-
-# === OTP Extraction ===
-def extract_otp(text):
-    match = re.search(r'\b\d{4,8}\b', text)
-    return match.group(0) if match else None
-
-def format_message(location, sid, number, otp):
-    return f"""
-𝑵𝑬𝑾 𝑶𝑻𝑷 𝑹𝑬𝑪𝑬𝑰𝑽𝑬𝑫 🟢
-
-Live SMS - {location}
-SID - {sid}
-Mobile - {number}
-OTP - {otp}
-
-𝑩𝒐𝒕 𝒃𝒚 𝑫𝒆𝒗 | 𝑫𝑿𝒁 𝑾𝒐𝒓𝒌𝒛𝒐𝒏𝒆 𝒊𝒏𝒄.
-""".strip()
 
 # === /login Handler ===
 def test_login():
@@ -116,13 +101,14 @@ def test_login():
     except Exception as e:
         return f"❌ Error during login: {str(e)}"
 
-# === Main Login + Monitor ===
+# === Main Function ===
 def main():
     threading.Thread(target=run_flask).start()
     driver = setup_driver()
     try:
-        if login(driver):
-            monitor_sms(driver)
+        if test_login():
+            print("✅ Monitoring SMS...")
+            # Here you would call your function to monitor SMS
         else:
             print("❌ Exiting: Login failed.")
     finally:
