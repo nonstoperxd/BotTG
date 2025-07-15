@@ -10,45 +10,39 @@ from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.chrome.service import Service
 from webdriver_manager.chrome import ChromeDriverManager
 
-# === Flask App (Health Check + Telegram Webhook Handler) ===
+# === Flask App ===
 app = Flask(__name__)
 
 @app.route("/")
 def index():
     return "OTP Bot is running!", 200
 
-@app.route(f"/webhook/{TELEGRAM_BOT_TOKEN}", methods=["POST"])
+@app.route(f"/webhook/7681288998:AAE9OzduHanSU3drsnAsCmOY2na7af0OVro", methods=["POST"])
 def telegram_webhook():
     data = request.get_json()
     if data and "message" in data:
         chat_id = data["message"]["chat"]["id"]
         text = data["message"].get("text", "")
-        if text.strip() == "/start":
+        if text.strip().lower() == "/start":
             send_message(chat_id, "✅ Bot is running and monitoring OTPs!")
     return {"ok": True}, 200
 
 def run_flask():
     app.run(host='0.0.0.0', port=10000)
 
-# === Telegram Bot Configuration ===
-TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "7681288998:AAE9OzduHanSU3drsnAsCmOY2na7af0OVro")
-TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "1002541578739")
-WEBHOOK_URL = f"WEBHOOK_URL = "https://bottg-4mz8.onrender.com/webhook/7681288998:AAE9OzduHanSU3drsnAsCmOY2na7af0OVro"}"
+# === Config ===
+TELEGRAM_BOT_TOKEN = "7681288998:AAE9OzduHanSU3drsnAsCmOY2na7af0OVro"
+TELEGRAM_CHAT_ID = "1002541578739"
+WEBHOOK_URL = f"https://bottg-4mz8.onrender.com/webhook/{TELEGRAM_BOT_TOKEN}"
 
-# === IVASMS Credentials ===
 EMAIL = 'Unseendevx2@gmail.com'
 PASSWORD = 'RheaxDev@2025'
-
 last_sent_otp = None
 
-# === Telegram API ===
+# === Telegram Send ===
 def send_message(chat_id, text):
     url = f'https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}/sendMessage'
-    payload = {
-        'chat_id': chat_id,
-        'text': text,
-        'parse_mode': 'Markdown'
-    }
+    payload = {'chat_id': chat_id, 'text': text, 'parse_mode': 'Markdown'}
     try:
         return requests.post(url, data=payload).ok
     except Exception as e:
@@ -61,7 +55,7 @@ def set_webhook():
     if response.ok:
         print("✅ Webhook set successfully.")
     else:
-        print("❌ Failed to set webhook:", response.text)
+        print("❌ Webhook failed:", response.text)
 
 # === OTP Monitoring ===
 def extract_otp(text):
@@ -90,16 +84,30 @@ def setup_driver():
 def login(driver):
     print("🔐 Logging into IVASMS...")
     driver.get('https://www.ivasms.com/login')
-    driver.find_element(By.NAME, "email").send_keys(EMAIL)
-    driver.find_element(By.NAME, "password").send_keys(PASSWORD)
-    driver.find_element(By.NAME, "remember").click()
-    driver.find_element(By.CSS_SELECTOR, "button[type=submit]").click()
+    time.sleep(2)
+
+    # Fill email field
+    email_input = driver.find_element(By.XPATH, "//input[@type='email']")
+    email_input.send_keys(EMAIL)
+
+    # Fill password field
+    password_input = driver.find_element(By.XPATH, "//input[@type='password']")
+    password_input.send_keys(PASSWORD)
+
+    # Click on 'Remember Me'
+    remember_checkbox = driver.find_element(By.NAME, "remember")
+    if not remember_checkbox.is_selected():
+        remember_checkbox.click()
+
+    # Submit login form
+    login_button = driver.find_element(By.CSS_SELECTOR, "button[type='submit']")
+    login_button.click()
     time.sleep(5)
 
 def monitor_sms(driver):
     global last_sent_otp
     driver.get('https://www.ivasms.com/portal/live/my_sms')
-    print("📡 Monitoring SMS...")
+    print("📡 Monitoring OTPs...")
 
     while True:
         try:
@@ -117,9 +125,9 @@ def monitor_sms(driver):
                 otp = extract_otp(message)
                 if otp and otp != last_sent_otp:
                     last_sent_otp = otp
-                    text = format_message(location, sid, mobile_number, otp)
-                    if send_message(TELEGRAM_CHAT_ID, text):
-                        print(f"✅ Sent OTP: {otp}")
+                    msg = format_message(location, sid, mobile_number, otp)
+                    if send_message(TELEGRAM_CHAT_ID, msg):
+                        print(f"✅ OTP Sent: {otp}")
                     else:
                         print("❌ Failed to send OTP")
             time.sleep(5)
