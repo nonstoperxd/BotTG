@@ -31,8 +31,8 @@ def run_flask():
 
 # === Config ===
 TELEGRAM_BOT_TOKEN = "7681288998:AAE9OzduHanSU3drsnAsCmOY2na7af0OVro"
-TELEGRAM_CHAT_ID = "-1002541578739"  # Your channel
-TELEGRAM_USER_ID = 6864709585        # Your personal Telegram ID (@Unlimitedxr)
+TELEGRAM_CHAT_ID = "-1002541578739"
+TELEGRAM_USER_ID = 6864709585
 WEBHOOK_URL = f"https://bottg-4mz8.onrender.com/webhook/{TELEGRAM_BOT_TOKEN}"
 
 EMAIL = 'Unseendevx2@gmail.com'
@@ -79,6 +79,7 @@ OTP - {otp}
 
 def setup_driver():
     chrome_options = Options()
+    chrome_options.binary_location = "/usr/bin/google-chrome"  # For Render
     chrome_options.add_argument("--headless=new")
     chrome_options.add_argument("--no-sandbox")
     chrome_options.add_argument("--disable-dev-shm-usage")
@@ -104,11 +105,11 @@ def login(driver):
     time.sleep(5)
 
     if "Dashboard" in driver.page_source:
-        print("✅ Login successful — 'Dashboard' found.")
+        print("✅ Login successful.")
         send_message(TELEGRAM_USER_ID, "✅ Login to IVASMS successful. Bot is now monitoring OTPs.")
         return True
     else:
-        print("❌ Login failed — 'Dashboard' not found.")
+        print("❌ Login failed.")
         send_message(TELEGRAM_CHAT_ID, "❌ *Login to IVASMS failed.* Please check credentials or site status.")
         return False
 
